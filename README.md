@@ -4,11 +4,13 @@ Fast Read Only HashMap on Disk
 ### Description
 
 This is a java implementation of a fast read only hash map in Java. 
+
 Pro: 
 - It is fast to read (about 4,000 readings per second)
 - Very fast to write (about 1,000,000 writings per second)
 - It is purely on disk, No loading time.
 - Efficient on disk space.
+
 Cons:
 - It is read only, you build it in a batch.
 - Small probablity of collision (and so error during reading). 
