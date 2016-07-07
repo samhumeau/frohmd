@@ -181,7 +181,7 @@ public class FrohmdMapBuilder implements Closeable{
 	
 	public static void main(String[] args) throws IOException{
 		FrohmdMapBuilder fmb=new FrohmdMapBuilder("testIndex");
-		for (int i=0; i<250_000_000; i++){
+		for (int i=0; i<200_000_000; i++){
 			fmb.put("key"+i, "This is the value (and it is quite a very very very long value) for the key. "+i);
 		}
 		fmb.close();

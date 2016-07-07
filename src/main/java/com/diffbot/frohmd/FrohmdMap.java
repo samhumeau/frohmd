@@ -14,6 +14,7 @@ import com.google.common.hash.Hashing;
 
 
 public class FrohmdMap implements Closeable{
+	
 	private static final Charset charset=Charset.forName("UTF-8");
 	private  RandomAccessForLargeFile accessIndexHead;
 	private RandomAccessForLargeFile accessIndexBody;
@@ -81,8 +82,8 @@ public class FrohmdMap implements Closeable{
 		long start=System.nanoTime();
 		Random rand=new Random();
 		int nbError=0;
-		for (int i=0; i<10000; i++){
-			int ri=rand.nextInt(250_000_000);
+		for (int i=0; i<100000; i++){
+			int ri=rand.nextInt(200_000_000);
 			String s=map.getString("key"+ri);
 			if (!s.endsWith(String.valueOf(ri)))
 					nbError++;

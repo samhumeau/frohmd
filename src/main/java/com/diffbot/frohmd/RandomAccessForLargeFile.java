@@ -54,9 +54,9 @@ public class RandomAccessForLargeFile implements Closeable {
     }
     
     public byte[] getBytes(long position, int length) throws ArrayIndexOutOfBoundsException{
-    	if ((position+length) > file.length() || position<0){
+    	if ((position+length) > fileLength || position<0){
     		System.out.println(position+length);
-    		System.out.println(file.length());
+    		System.out.println(fileLength);
     		throw new ArrayIndexOutOfBoundsException("Access out of bounds");
     	}
     	
