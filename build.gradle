@@ -20,6 +20,20 @@ task server(type:JavaExec) {
   jvmArgs(defaults)
 }
 
+task testInject(type:JavaExec) {
+  classpath = sourceSets.main.runtimeClasspath
+  main = 'com.diffbot.frohmd.webapp.InjectTest';
+  if(project.hasProperty('arguments')){
+    args(arguments.split("\\s+"))
+  }
+  args(arguments.split("\\s+"))
+  List<String> defaults = new ArrayList<>();
+  defaults.add("-Xmx2G")
+  jvmArgs(defaults)
+}
+
+
+
 
 // In this section you declare the dependencies for your production and test code
 dependencies {
@@ -41,16 +55,4 @@ dependencies {
     testCompile 'junit:junit:3.8.2'
 }
 
-publishing {
-    publications {
-        myPublication(MavenPublication) {
-            from components.java
-        }
-    }
-    repositories {
-        maven {
-            url "file:/${project.projectDir}/artifacts"
-        }
-    }
-}
 
