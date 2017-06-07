@@ -1,0 +1,7 @@
+# Frohmd configuration
+
+title = "Frohmd configuration"
+
+[server]
+port = 6800
+shards = ["./data/shard1","./data/shard2","./data/shard3","./data/shard4","./data/shard5","./data/shard6","./data/shard7","./data/shard8"]
