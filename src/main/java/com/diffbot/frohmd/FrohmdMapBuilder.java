@@ -13,12 +13,16 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import com.github.luben.zstd.Zstd;
+import com.github.luben.zstd.ZstdDictCompress;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 
+/** Main class to build a Frohmd Map */
 public class FrohmdMapBuilder implements Closeable{
 	int logNbBuckets = 5; // meaning the number of buckets is 2^5=32
 	int nbBuckets = (int) Math.pow(2, logNbBuckets);
@@ -26,42 +30,111 @@ public class FrohmdMapBuilder implements Closeable{
 	OutputStream os_datastore;
 	OutputStream[] os_index;
 	long currentPositionInDatastore=0L;
-	long nbKeys=0L;
+	public long nbKeys=0L, sizeRecord = 0L;
 	public static final Charset charset=Charset.forName("UTF-8");
 	String path;
 	
+	// parameter for compression
+	boolean compress = false;
+	byte[] dictionary_compression;
+	ZstdDictCompress dictCompress = null;
+	List<byte[]> keysForDict = new ArrayList<>();
+	List<byte[]> valuesForDict = new ArrayList<>();
+
 	
-	public FrohmdMapBuilder(String path) {
+	
+	public FrohmdMapBuilder(String path) throws IOException{
+		init(path, false);
+	}
+	
+	public FrohmdMapBuilder(String path, boolean compress)  throws IOException{
+		init(path,compress);
+	}
+	
+	public void init(String path, boolean compress) throws IOException{
 		this.path=path;
-		try{
-			os_datastore=new BufferedOutputStream(new FileOutputStream(path+".data"));
-			os_index=new OutputStream[nbBuckets];
-			for (int i=0; i<nbBuckets; i++)
-				os_index[i]=new BufferedOutputStream(new FileOutputStream(path+".index_tmp"+i));
-		}catch(IOException ioe){
-			ioe.printStackTrace();
-		}
+		os_datastore=new BufferedOutputStream(new FileOutputStream(path+".data"));
+		os_index=new OutputStream[nbBuckets];
+		for (int i=0; i<nbBuckets; i++)
+			os_index[i]=new BufferedOutputStream(new FileOutputStream(path+".index_tmp"+i));
+		this.compress = compress;
+	}
+	
+	
+	public static byte[] stringToBytes(String key){
+		return key.getBytes(charset);
 	}
 	
 	public void put(String key, String data) throws IOException{
-		byte[] b_key=key.getBytes(charset);
-		byte[] b_data=data.getBytes(charset);
+		byte[] b_key= stringToBytes(key);
+		byte[] b_data= stringToBytes(data);
 		put(b_key,b_data);
 	}
 	
 	public synchronized void put(byte[] key, byte[] data) throws IOException{
-		long hash=hashFunc.hashBytes(key).asLong();
-		int bucketId= getBucketorSlotId(hash, logNbBuckets, nbBuckets);
-		int lengthData=data.length;
-		os_datastore.write(data);
-		
-		os_index[bucketId].write(IndexLine.toLine(hash, currentPositionInDatastore, lengthData));
-		currentPositionInDatastore+=lengthData;
-		nbKeys++;
+		if (compress){
+			if (dictCompress != null)
+				actualPut(key, data);
+			else{
+				keysForDict.add(key);
+				valuesForDict.add(data);
+				if (keysForDict.size()==100){
+					buildDictionary();
+				}
+			}
+		}
+		else{
+			actualPut(key, data);
+		}
+	}
+	
+	private void buildDictionary() throws IOException{
+		// conatenate the 100 values given as example to build the dictionary
+		int sizeDict = 0;
+		for (byte[] bs : valuesForDict)
+			sizeDict+=bs.length;
+		dictionary_compression = new byte[sizeDict];
+		int counter =0;
+		for (byte[] bs : valuesForDict)
+			for (int i=0; i<bs.length; i++){
+				dictionary_compression[counter] = bs[i];
+				counter++;
+			}
+		dictCompress = new ZstdDictCompress(dictionary_compression, 1);
+		for (int i=0; i<keysForDict.size(); i++){
+			actualPut(keysForDict.get(i), valuesForDict.get(i));
+		}
 	}
 	
 	
+	private void actualPut(byte[] key, byte[] data) throws IOException{
+		long hash=hashFunc.hashBytes(key).asLong();
+		int bucketId= getBucketorSlotId(hash, logNbBuckets, nbBuckets);
+		byte[] compressed = data;
+		if (compress){
+			compressed = Zstd.compress(data, dictCompress);
+		}
+		int lengthData=data.length;
+		int lengthCompressed = compressed.length;
+		os_datastore.write(compressed);
+		
+		byte[] il = IndexLine.toLine(hash, currentPositionInDatastore, lengthCompressed, lengthData);
+		os_index[bucketId].write(il);
+		currentPositionInDatastore+=lengthCompressed;
+		nbKeys++;
+		sizeRecord+=lengthCompressed;
+	}
+	
+	
+	
 	private void closeOS(){
+		if (compress && dictCompress == null){
+			try {
+				buildDictionary();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 		try {
 			os_datastore.close();
 		} catch (IOException e1) {
@@ -98,7 +171,7 @@ public class FrohmdMapBuilder implements Closeable{
 			try {
 				InputStream is=new BufferedInputStream(new FileInputStream(f));
 				List<IndexLine> allLines=new ArrayList<IndexLine>();
-				byte[] buffer=new byte[20];
+				byte[] buffer=new byte[IndexLine.sizeLine];
 				int nbByteRead=is.read(buffer);
 				while(nbByteRead!=-1){
 					allLines.add(new IndexLine(buffer));
@@ -110,14 +183,14 @@ public class FrohmdMapBuilder implements Closeable{
 				for (IndexLine line : allLines){
 					int slotId=getBucketorSlotId(line.hash, logNbSlots, nbSlots);
 					while(currentSlotId<slotId){
-						io_headIndex.write(IndexLine.toLine(currentSlotId, positionSlotInIndexBody, nbbytesInCurrentSlot));
+						io_headIndex.write(IndexLine.toLine(currentSlotId, positionSlotInIndexBody, nbbytesInCurrentSlot, nbbytesInCurrentSlot));
 						currentSlotId++;
 						nbbytesInCurrentSlot=0;
 						positionSlotInIndexBody=currentPositionInIndexBody;
 					}
-					io_index.write(IndexLine.toLine(line.hash, line.position, line.length));
-					nbbytesInCurrentSlot+=20;
-					currentPositionInIndexBody+=20;
+					io_index.write(IndexLine.toLine(line.hash, line.position, line.lengthCompressed, line.lengthUncompressed));
+					nbbytesInCurrentSlot+=IndexLine.sizeLine;
+					currentPositionInIndexBody+=IndexLine.sizeLine;
 				}
 				f.delete();
 			} catch (IOException e) {
@@ -126,7 +199,7 @@ public class FrohmdMapBuilder implements Closeable{
 		}
 		while(currentSlotId<nbSlots){
 			try {
-				io_headIndex.write(IndexLine.toLine(currentSlotId, positionSlotInIndexBody, nbbytesInCurrentSlot));
+				io_headIndex.write(IndexLine.toLine(currentSlotId, positionSlotInIndexBody, nbbytesInCurrentSlot,nbbytesInCurrentSlot));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -140,6 +213,15 @@ public class FrohmdMapBuilder implements Closeable{
 			DataOutputStream dos=new DataOutputStream(new FileOutputStream(path+".mapProperties"));
 			dos.writeInt(logNbSlots);
 			dos.writeLong(nbSlots);
+			dos.writeLong(nbKeys);
+			dos.writeLong(sizeRecord);
+			dos.writeBoolean(compress);
+			if (compress){
+				dos.writeInt(dictionary_compression.length);
+				dos.write(dictionary_compression);
+				System.out.println(Arrays.hashCode(dictionary_compression));
+				dictCompress.close();
+			}
 			dos.close();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -155,22 +237,19 @@ public class FrohmdMapBuilder implements Closeable{
 
 	@Override
 	public void close() throws IOException {
-		System.out.println("closing the map, preparing the index.");
 		closeOS();
-		System.out.println("starting to sort the index");
 		sortIndex();
-		System.out.println("done.");
 		
 	}
 	
 	public static void printIndexFile(String path){
 		try{
 			InputStream is=new BufferedInputStream(new FileInputStream(path));
-			byte[] buffer=new byte[20];
+			byte[] buffer=new byte[IndexLine.sizeLine];
 			int nbByteRead=is.read(buffer);
 			while(nbByteRead!=-1){
 				IndexLine il=new IndexLine(buffer);
-				System.out.println(il.hash+","+il.position+","+il.length);
+				System.out.println(il.hash+","+il.position+","+il.lengthCompressed+","+il.lengthUncompressed);
 				nbByteRead=is.read(buffer);
 			}
 			is.close();
@@ -180,11 +259,17 @@ public class FrohmdMapBuilder implements Closeable{
 	}
 	
 	public static void main(String[] args) throws IOException{
-		FrohmdMapBuilder fmb=new FrohmdMapBuilder("testIndex");
-		for (int i=0; i<200_000_000; i++){
+		long start = System.nanoTime();
+		FrohmdMapBuilder fmb=new FrohmdMapBuilder("testIndex", true);
+		for (int i=0; i<1_000_000; i++){
+			if (i%100000 == 0)
+				System.out.println(i);
 			fmb.put("key"+i, "This is the value (and it is quite a very very very long value) for the key. "+i);
 		}
+		System.out.println((System.nanoTime()-start)/1e6+"ms to insert");
+		start = System.nanoTime();
 		fmb.close();
+		System.out.println((System.nanoTime()-start)/1e6+"ms to index");
 	}
 
 }

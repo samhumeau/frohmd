@@ -7,8 +7,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.Random;
 
+import com.github.luben.zstd.Zstd;
+import com.github.luben.zstd.ZstdDictDecompress;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 
@@ -21,7 +22,12 @@ public class FrohmdMap implements Closeable{
 	private RandomAccessForLargeFile accessData;
 	private long nbSlots;
 	private int logNbSlots;
+	public long nbKeys, sizeData;
 	private HashFunction hashFunc=Hashing.murmur3_128();
+	
+	// for compression
+	boolean compress = false;
+	private ZstdDictDecompress dictDecompress;
 
 	public FrohmdMap(String path) throws IOException {
 		accessData=new RandomAccessForLargeFile(new File(path+".data"));
@@ -31,10 +37,21 @@ public class FrohmdMap implements Closeable{
 		DataInputStream dis=new DataInputStream(new FileInputStream(path+".mapProperties"));
 		logNbSlots=dis.readInt();
 		nbSlots=dis.readLong();
+		nbKeys= dis.readLong();
+		sizeData = dis.readLong();
+		compress = dis.readBoolean();
+		if (compress){
+			int sizeDict = dis.readInt();
+			byte[] buffer = new byte[sizeDict];
+			dis.read(buffer);
+			dictDecompress = new ZstdDictDecompress(buffer);
+		}
 		dis.close();
 	}
 	
-	
+	public static String bytesToString(byte[] bytes){
+		return new String(bytes, charset);
+	}
 	
 	public String getString(String key){
 		byte[] b_key=key.getBytes(charset);
@@ -49,13 +66,13 @@ public class FrohmdMap implements Closeable{
 	public synchronized byte[] get(byte[] key){
 		long hash=hashFunc.hashBytes(key).asLong();
 		long positionInIndexHead=FrohmdMapBuilder.getBucketorSlotId(hash, logNbSlots, nbSlots);
-		IndexLine headLine=new IndexLine(accessIndexHead.getBytes(positionInIndexHead*20, 20));
+		IndexLine headLine=new IndexLine(accessIndexHead.getBytes(positionInIndexHead*IndexLine.sizeLine, IndexLine.sizeLine));
 		
-		byte[] slot=accessIndexBody.getBytes(headLine.position, headLine.length);
+		byte[] slot=accessIndexBody.getBytes(headLine.position, headLine.lengthCompressed);
 		//System.out.println(slot.length+"<-slot");
 		IndexLine indexBodyLine=null;
-		for (int i=0; i<slot.length; i+=20){
-			byte[] buffer=Arrays.copyOfRange(slot, i, i+20);
+		for (int i=0; i<slot.length; i+=IndexLine.sizeLine){
+			byte[] buffer=Arrays.copyOfRange(slot, i, i+IndexLine.sizeLine);
 			IndexLine line=new IndexLine(buffer);
 			if (line.hash==hash){
 				indexBodyLine=line;
@@ -65,8 +82,12 @@ public class FrohmdMap implements Closeable{
 		if (indexBodyLine==null)
 			return null;
 		
-		byte[] data=accessData.getBytes(indexBodyLine.position, indexBodyLine.length);
-		return data;
+		byte[] dataCompressed=accessData.getBytes(indexBodyLine.position, indexBodyLine.lengthCompressed);
+		byte[] dataUncompressed = dataCompressed;
+		if (compress){
+			dataUncompressed = Zstd.decompress(dataCompressed, dictDecompress, indexBodyLine.lengthUncompressed);
+		}
+		return dataUncompressed;
 	}
 	
 	
@@ -79,18 +100,19 @@ public class FrohmdMap implements Closeable{
 	
 	public static void main(String[] args) throws IOException {
 		FrohmdMap map=new FrohmdMap("testIndex");
-		long start=System.nanoTime();
-		Random rand=new Random();
-		int nbError=0;
-		for (int i=0; i<100000; i++){
-			int ri=rand.nextInt(200_000_000);
-			String s=map.getString("key"+ri);
-			if (!s.endsWith(String.valueOf(ri)))
-					nbError++;
-		}
-		
-		System.out.println("10,000 random reads in "+(System.nanoTime()-start)/1e6+"ms");
-		System.out.println(nbError);
+		System.out.println(map.getString("key"+1));
+//		long start=System.nanoTime();
+//		Random rand=new Random();
+//		int nbError=0;
+//		for (int i=0; i<10000; i++){
+//			int ri=rand.nextInt(5_000_000);
+//			String s=map.getString("key"+ri);
+//			if (!s.endsWith(String.valueOf(ri)))
+//					nbError++;
+//		}
+//		
+//		System.out.println("10,000 random reads in "+(System.nanoTime()-start)/1e6+"ms");
+//		System.out.println(nbError);
 		map.close();
 	}
 	
