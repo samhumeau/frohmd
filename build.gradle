@@ -20,13 +20,12 @@ task server(type:JavaExec) {
   jvmArgs(defaults)
 }
 
-task testInject(type:JavaExec) {
+task testinject(type:JavaExec) {
   classpath = sourceSets.main.runtimeClasspath
   main = 'com.diffbot.frohmd.webapp.InjectTest';
   if(project.hasProperty('arguments')){
     args(arguments.split("\\s+"))
   }
-  args(arguments.split("\\s+"))
   List<String> defaults = new ArrayList<>();
   defaults.add("-Xmx2G")
   jvmArgs(defaults)
