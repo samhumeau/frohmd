@@ -11,6 +11,17 @@ dependencies {
     compile 'org.slf4j:slf4j-api:1.7.13'
     
     compile group: 'com.google.guava', name: 'guava', version: '19.0'
+	compile group: 'postgresql', name: 'postgresql', version: '9.1-901-1.jdbc4'
+	compile group: 'com.github.luben', name: 'zstd-jni', version: '1.2.0'
+	compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-core', version: '8.5.14'
+	compile group: 'org.json', name: 'json', version: '20160810'
+	compile group: 'commons-io', name: 'commons-io', version: '2.5'
+	compile group: 'com.datastax.cassandra', name: 'cassandra-driver-core', version: '3.1.4'
+	compile group: 'com.github.luben', name: 'zstd-jni', version: '1.1.4'
+	compile group: 'net.jpountz.lz4', name: 'lz4', version: '1.3.0'
+	
+	
+	
 
     // Declare the dependency for your favourite test framework you want to use in your tests.
     testCompile 'junit:junit:3.8.2'
