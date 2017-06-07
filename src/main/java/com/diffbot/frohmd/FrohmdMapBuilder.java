@@ -242,6 +242,10 @@ public class FrohmdMapBuilder implements Closeable{
 		
 	}
 	
+	public boolean isCompress(){
+		return compress;
+	}
+	
 	public static void printIndexFile(String path){
 		try{
 			InputStream is=new BufferedInputStream(new FileInputStream(path));
@@ -261,7 +265,7 @@ public class FrohmdMapBuilder implements Closeable{
 	public static void main(String[] args) throws IOException{
 		long start = System.nanoTime();
 		FrohmdMapBuilder fmb=new FrohmdMapBuilder("testIndex", true);
-		for (int i=0; i<1_000_000; i++){
+		for (int i=0; i<30_000_000; i++){
 			if (i%100000 == 0)
 				System.out.println(i);
 			fmb.put("key"+i, "This is the value (and it is quite a very very very long value) for the key. "+i);

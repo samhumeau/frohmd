@@ -26,7 +26,7 @@ public class AddCollectionServlet extends HttpServlet{
 			return;
 		}
 		
-		String compression_s = req.getParameter("name");
+		String compression_s = req.getParameter("compression");
 		boolean compression = "true".equals(compression_s);
 		
 		for (Shard s : Server.shards){

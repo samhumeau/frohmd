@@ -31,7 +31,7 @@ public class Server {
 	public static void main(String[] args) throws LifecycleException, IOException {
 		init();
 		Tomcat tomcat = new Tomcat();
-		tomcat.setPort(6800);
+		tomcat.setPort(PropertyCluster.getPort());
 
 		System.out.println("starting the server, loading in memory the static resources ...");
 		Context ctx = tomcat.addContext("/", new File(".").getAbsolutePath());
@@ -49,7 +49,10 @@ public class Server {
 		ctx.addServletMappingDecoded("/search","search");
 		
 		Tomcat.addServlet(ctx, "status", new StatusServlet());
-		ctx.addServletMappingDecoded("/","status");
+		ctx.addServletMappingDecoded("/status","status");
+		
+		Tomcat.addServlet(ctx, "index", new IndexServlet());
+		ctx.addServletMappingDecoded("/","index");
 
 		
 		tomcat.start();

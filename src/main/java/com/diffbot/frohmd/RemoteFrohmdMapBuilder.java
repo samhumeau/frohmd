@@ -179,7 +179,7 @@ public class RemoteFrohmdMapBuilder implements Closeable{
 	
 	public static void main(String[] args) throws Exception {
 		long start = System.nanoTime();
-		try(RemoteFrohmdMapBuilder rfmb = new RemoteFrohmdMapBuilder("http://localhost:6800", "test2", false);){
+		try(RemoteFrohmdMapBuilder rfmb = new RemoteFrohmdMapBuilder("http://localhost:6800", "test2", true);){
 			for (int i=0; i<100_000_000; i++){
 				if (i%100000 == 0)
 					System.out.println(i);

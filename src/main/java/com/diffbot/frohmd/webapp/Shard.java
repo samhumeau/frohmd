@@ -2,14 +2,16 @@ package com.diffbot.frohmd.webapp;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
 
 import com.diffbot.frohmd.FrohmdMap;
 import com.diffbot.frohmd.FrohmdMapBuilder;
+import com.diffbot.frohmd.IndexLine;
 
 public class Shard {
 
@@ -53,6 +55,7 @@ public class Shard {
 		if (ff.exists() & ff.isDirectory())
 			FileUtils.deleteDirectory(ff);
 		ff.mkdirs();
+		System.out.println(compress);
 		openedBuilders.put(collection, new FrohmdMapBuilder(ff.getAbsolutePath()+"/base", compress));
 	}
 	
@@ -81,36 +84,79 @@ public class Shard {
 	}
 	
 	
-	public JSONObject status(){
-		JSONObject jo = new JSONObject();
-		jo.put("status", "ok");
-		JSONObject collections = new JSONObject();
+	
+	/***************************
+	 * 
+	 *  Status
+	 *************************/
+	
+	
+	public static class CollectionStatus{
+		String status = "FINALIZED";
+		String name = "zz";
+		long numberOfKeys;
+		long sizeDataByte;
+		boolean isCompressed;
+		
+		public void merge(CollectionStatus otherCollectionStatus){
+			if (name.equals(otherCollectionStatus.name)){
+				if ("GETTINGDATA".equals(status) || "GETTINGDATA".equals(otherCollectionStatus))
+					status = "GETTINGDATA";
+				else if ("INDEXING".equals(status) || "INDEXING".equals(otherCollectionStatus))
+					status = "INDEXING";
+				else
+					status = "FINALIZED";
+				numberOfKeys += otherCollectionStatus.numberOfKeys;
+				sizeDataByte += otherCollectionStatus.sizeDataByte;
+				if (isCompressed || otherCollectionStatus.isCompressed)
+					isCompressed = true;
+			}
+		}
+		@Override
+		public String toString() {
+			return "<tr><td>"+name+"</td><td>"+status+"</td><td>"+(numberOfKeys* IndexLine.sizeLine + sizeDataByte)/1000000+"MB</td><td>"+isCompressed+"</td></tr>";
+		}
+		public static String getHeader(){
+			return "<tr><th>name</th><th>status</th><th>total size on disk</th><th>compressed</th></tr>";
+		}
+	}
+	
+	public static class Status{
+		String status = "ok";
+		String folderOnDisk;
+		List<CollectionStatus> collections = new  ArrayList<>();
+	}
+	
+	public Status status(){
+		Status answer = new Status();
+		answer.folderOnDisk = shardFolder;
 		for (String key : openedBuilders.keySet()){
-			JSONObject col = new JSONObject();
-			col.put("status", "GETTINGDATA");
-			col.put("name", key);
-			col.put("number of keys", openedBuilders.get(key).nbKeys);
-			col.put("size data (byte)", openedBuilders.get(key).sizeRecord);
-			collections.put(key, col);
+			CollectionStatus col = new CollectionStatus();
+			col.status = "GETTINGDATA";
+			col.name = key;
+			col.numberOfKeys = openedBuilders.get(key).nbKeys;
+			col.sizeDataByte = openedBuilders.get(key).sizeRecord;
+			col.isCompressed = openedBuilders.get(key).isCompress();
+			answer.collections.add(col);
 		}
 		for (String key : indexedBuilders.keySet()){
-			JSONObject col = new JSONObject();
-			col.put("status", "INDEXING");
-			col.put("name", key);
-			col.put("number of keys", indexedBuilders.get(key).nbKeys);
-			col.put("size data (byte)", indexedBuilders.get(key).sizeRecord);
-			collections.put(key, col);
+			CollectionStatus col = new CollectionStatus();
+			col.status = "INDEXING";
+			col.name = key;
+			col.numberOfKeys = indexedBuilders.get(key).nbKeys;
+			col.sizeDataByte = indexedBuilders.get(key).sizeRecord;
+			col.isCompressed = indexedBuilders.get(key).isCompress();
+			answer.collections.add(col);
 		}
 		for (String key : openedReaders.keySet()){
-			JSONObject col = new JSONObject();
-			col.put("status", "FINALIZED");
-			col.put("name", key);
-			col.put("number of keys", openedReaders.get(key).nbKeys);
-			col.put("size data (byte)", openedReaders.get(key).sizeData);
-			collections.put(key, col);
+			CollectionStatus col = new CollectionStatus();
+			col.status = "FINALIZED";
+			col.name = key;
+			col.numberOfKeys = openedReaders.get(key).nbKeys;
+			col.sizeDataByte = openedReaders.get(key).sizeData;
+			col.isCompressed = openedReaders.get(key).isCompress();
+			answer.collections.add(col);
 		}
-		jo.put("collections", collections);
-		jo.put("dedicated folder", shardFolder);
-		return jo;
+		return answer;
 	}
 }

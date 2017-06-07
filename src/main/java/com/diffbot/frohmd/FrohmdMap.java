@@ -90,6 +90,10 @@ public class FrohmdMap implements Closeable{
 		return dataUncompressed;
 	}
 	
+	public boolean isCompress(){
+		return compress;
+	}
+	
 	
 	@Override
 	public void close() throws IOException  {
