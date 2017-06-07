@@ -11,7 +11,7 @@ public class InjectTest {
 			return;
 		}
 		long start = System.nanoTime();
-		try(RemoteFrohmdMapBuilder rfmb = new RemoteFrohmdMapBuilder(args[0], "test", true);){
+		try(RemoteFrohmdMapBuilder rfmb = new RemoteFrohmdMapBuilder(args[0], "test", false);){
 			for (int i=0; i<100_000_000; i++){
 				if (i%100000 == 0)
 					System.out.println(i+" elements injected");
