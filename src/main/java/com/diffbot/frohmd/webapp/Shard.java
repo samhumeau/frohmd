@@ -114,10 +114,10 @@ public class Shard {
 		}
 		@Override
 		public String toString() {
-			return "<tr><td>"+name+"</td><td>"+status+"</td><td>"+(numberOfKeys* IndexLine.sizeLine + sizeDataByte)/1000000+"MB</td><td>"+isCompressed+"</td></tr>";
+			return "<tr><td>"+name+"</td><td>"+status+"</td><td>"+(numberOfKeys* IndexLine.sizeLine + sizeDataByte)/1000000+"MB</td><td>"+numberOfKeys+"</td><td>"+isCompressed+"</td></tr>";
 		}
 		public static String getHeader(){
-			return "<tr><th>name</th><th>status</th><th>total size on disk</th><th>compressed</th></tr>";
+			return "<tr><th>name</th><th>status</th><th>total size on disk</th><th>number of keys</th><th>compressed</th></tr>";
 		}
 	}
 	
