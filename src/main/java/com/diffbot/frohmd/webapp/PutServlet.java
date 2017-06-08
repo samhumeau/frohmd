@@ -5,6 +5,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -71,17 +74,32 @@ public class PutServlet extends HttpServlet{
 					}
 				}
 			}
-			
 			List<Exception> exceptionRaised = new ArrayList<>();
-			batches.parallelStream().forEach(b -> {
-				for(int i=0; i<b.keys.size(); i++)
+			synchronized (PutServlet.class) {
+				ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+				for (Batch b : batches){
+					es.execute(new Runnable() {
+						@Override
+						public void run() {
+							for(int i=0; i<b.keys.size(); i++)
+								try {
+									b.shard.addData(nameCollection, b.keys.get(i), b.values.get(i));
+								} catch (IOException e) {
+									e.printStackTrace();
+									break;
+								}
+						}
+					});
+				}
+				es.shutdown();
+				while(!es.isTerminated())
 					try {
-						b.shard.addData(nameCollection, b.keys.get(i), b.values.get(i));
-					} catch (IOException e) {
+						es.awaitTermination(1, TimeUnit.MILLISECONDS);
+					} catch (InterruptedException e) {
 						e.printStackTrace();
-						break;
 					}
-			});
+			}
+
 			
 			if (exceptionRaised.size() ==0 )
 				AddCollectionServlet.sendSuccess("success", resp);

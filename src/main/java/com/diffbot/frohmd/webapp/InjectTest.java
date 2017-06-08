@@ -10,6 +10,7 @@ public class InjectTest {
 			System.out.println("No argument provided");
 			return;
 		}
+		System.out.println(args[0]);
 		long start = System.nanoTime();
 		try(RemoteFrohmdMapBuilder rfmb = new RemoteFrohmdMapBuilder(args[0], "test", false);){
 			for (int i=0; i<100_000_000; i++){
