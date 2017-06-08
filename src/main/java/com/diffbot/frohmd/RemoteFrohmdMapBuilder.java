@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json.JSONObject;
 
+import com.diffbot.frohmd.webapp.PropertyCluster;
 import com.diffbot.frohmd.webapp.Transmitter;
 import com.google.common.primitives.Ints;
 
@@ -21,7 +22,7 @@ public class RemoteFrohmdMapBuilder implements Closeable{
 	AtomicInteger currentNbBytes = new AtomicInteger(0);
 	public static final int limitNbValuesTransmittion = 200_000; // max 200_000 values transmitted
 	AtomicInteger currentNbValues = new AtomicInteger(0);
-	public static final int nbConcurrentTransmitters = 6;
+	public static final int nbConcurrentTransmitters = PropertyCluster.getNbTransmitters();
 	
 	ConcurrentLinkedQueue<byte[]> queue = new ConcurrentLinkedQueue<>();
 	Transmitter[] transmitters;

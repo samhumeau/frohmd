@@ -28,4 +28,9 @@ public class PropertyCluster {
 		return toml.getLong("server.port").intValue();
 	}
 
+	public static int getNbTransmitters(){
+		if (toml == null)
+			return 1;
+		return toml.getLong("transmition.nbtransmitters").intValue();
+	}
 }
